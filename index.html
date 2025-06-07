@@ -85,6 +85,26 @@
       display: flex;
       gap: 10px;
     }
+    .actions button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: white;
+      background: linear-gradient(135deg, #4a90e2, #357abd);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .actions button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      background: linear-gradient(135deg, #357abd, #2a5f9e);
+    }
+    .actions button:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
     .image-cropper {
       display: none;
       position: fixed;
