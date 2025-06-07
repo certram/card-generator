@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>文字卡片生成器</title>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+   <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+    }
+    .card-container {
+      background-color: white;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      position: relative;
+      width: 800px;
+      height: 600px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      justify-content: space-between;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+    }
+    .avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 15px;
+      border: 2px solid #ccc;
+    }
+    .name-date {
+      display: flex;
+      flex-direction: column;
+    }
+    .name {
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    .date-weather {
+      font-size: 0.9em;
+      color: gray;
+    }
+    .content {
+      flex-grow: 1;
+      white-space: pre-wrap;
+      overflow-y: auto;
+      font-size: 1em;
+      line-height: 1.6;
+    }
+    .input-area {
+      margin-bottom: 20px;
+      width: 800px;
+    }
+    textarea, input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+      font-size: 1em;
+    }
+    .checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+    .image-cropper {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+    }
+    .cropper-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 90%;
+      max-height: 90%;
+    }
+    .cropper-image {
+      max-width: 100%;
+      max-height: 90vh;
+    }
+    .cropper-overlay {
+      position: absolute;
+      border: 2px solid white;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+      cursor: move;
+      border-radius: 50%;
+    }
+    .cropper-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+    
+</head>
+<body>
+  <div class="input-area">
+    <input type="text" id="nameInput" placeholder="输入名字" />
+    <input type="file" id="avatarInput" accept="image/*" />
+    <textarea id="textInput" rows="6" placeholder="输入内容"></textarea>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="showDate" /> 显示日期</label>
+      <label><input type="checkbox" id="showWeather" /> 显示天气</label>
+      <select id="weatherSelect">
+        <option value="晴">晴</option>
+        <option value="多云">多云</option>
+        <option value="小雨">小雨</option>
+        <option value="雷阵雨">雷阵雨</option>
+        <option value="雪">雪</option>
+        <option value="大雨">大雨</option> 
+      </select>
+      <label>选择比例(横:竖)：</label>
+      <select id="aspectRatioSelect">
+        <option value="16:9">16:9</option>
+        <option value="9:16">9:16</option>
+        <option value="4:3" selected>4:3</option>
+        <option value="3:4">3:4</option>
+        <option value="21:9">21:9</option>
+        <option value="1:1">1:1</option>
+        <option value="3:2">3:2</option>
+        <option value="2:3">2:3</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button onclick="generateCard()">生成卡片</button>
+      <button onclick="downloadCard()">下载卡片</button>
+    </div>
+  </div>
+
+  <div class="image-cropper" id="imageCropper">
+    <div class="cropper-container">
+      <img id="cropperImage" class="cropper-image" />
+      <div id="cropperOverlay" class="cropper-overlay"></div>
+    </div>
+    <div class="cropper-controls">
+      <button onclick="applyCrop()">确认裁剪</button>
+      <button onclick="cancelCrop()">取消</button>
+    </div>
+  </div>
+
+  <div class="card-container" id="card">
+    <div class="header">
+      <div class="header-left">
+        <img src="" class="avatar" id="avatar" />
+        <div class="name-date">
+          <div class="name" id="name">用户昵称</div>
+          <div class="date-weather" id="extraInfo"></div>
+        </div>
+      </div>
+    </div>
+    <div class="content" id="content">这里显示输入的内容</div>
+  </div>
+  <script>
+function setCardAspectRatio(ratio) {
+      const [w, h] = ratio.split(":").map(Number);
+      const baseWidth = 800;
+      const height = Math.round(baseWidth * h / w);
+      const card = document.getElementById('card');
+      card.style.width = baseWidth + 'px';
+      card.style.height = height + 'px';
+    }
+
+    function generateCard() {
+      const name = document.getElementById('nameInput').value;
+      const text = document.getElementById('textInput').value;
+      const avatarFile = document.getElementById('avatarInput').files[0];
+      const showDate = document.getElementById('showDate').checked;
+      const showWeather = document.getElementById('showWeather').checked;
+      const weather = document.getElementById('weatherSelect').value;
+      const ratio = document.getElementById('aspectRatioSelect').value;
+
+      setCardAspectRatio(ratio);
+
+      document.getElementById('name').textContent = name || '用户昵称';
+      document.getElementById('content').textContent = text || '这里显示输入的内容';
+
+      let extraInfo = [];
+      if (showDate) {
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
+        extraInfo.push(dateStr);
+      }
+      if (showWeather) {
+        extraInfo.push(weather);
+      }
+      document.getElementById('extraInfo').textContent = extraInfo.join(' | ');
+
+      if (avatarFile) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          showImageCropper(e.target.result);
+        };
+        reader.readAsDataURL(avatarFile);
+      }
+    }
+
+    let isDragging = false;
+    let startX, startY;
+    let overlayLeft, overlayTop;
+    let cropperImage;
+
+    function showImageCropper(imageUrl) {
+      const cropper = document.getElementById('imageCropper');
+      const image = document.getElementById('cropperImage');
+      const overlay = document.getElementById('cropperOverlay');
+      
+      cropper.style.display = 'block';
+      image.src = imageUrl;
+      cropperImage = image;
+
+      image.onload = function() {
+        const size = Math.min(image.width, image.height) * 0.8; // 设置裁剪框为图片较小边的80%
+        overlay.style.width = size + 'px';
+        overlay.style.height = size + 'px';
+        overlay.style.left = (image.width - size) / 2 + 'px';
+        overlay.style.top = (image.height - size) / 2 + 'px';
+      };
+
+      overlay.addEventListener('mousedown', startDrag);
+      document.addEventListener('mousemove', drag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+
+    function startDrag(e) {
+      isDragging = true;
+      const overlay = document.getElementById('cropperOverlay');
+      startX = e.clientX;
+      startY = e.clientY;
+      overlayLeft = overlay.offsetLeft;
+      overlayTop = overlay.offsetTop;
+    }
+
+    function drag(e) {
+      if (!isDragging) return;
+      
+      const overlay = document.getElementById('cropperOverlay');
+      const image = document.getElementById('cropperImage');
+      
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+      
+      let newLeft = overlayLeft + deltaX;
+      let newTop = overlayTop + deltaY;
+      
+      // 限制裁剪框不超出图片范围
+      const maxLeft = image.width - overlay.offsetWidth;
+      const maxTop = image.height - overlay.offsetHeight;
+      
+      newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+      newTop = Math.max(0, Math.min(newTop, maxTop));
+      
+      overlay.style.left = newLeft + 'px';
+      overlay.style.top = newTop + 'px';
+    }
+
+    function stopDrag() {
+      isDragging = false;
+    }
+
+    function applyCrop() {
+      const overlay = document.getElementById('cropperOverlay');
+      const image = document.getElementById('cropperImage');
+      
+      const canvas = document.createElement('canvas');
+      const size = overlay.offsetWidth; // 使用裁剪框的实际大小
+      canvas.width = canvas.height = size;
+      
+      const ctx = canvas.getContext('2d');
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      const scale = image.naturalWidth / image.width;
+      const cropX = overlay.offsetLeft * scale;
+      const cropY = overlay.offsetTop * scale;
+      const cropSize = overlay.offsetWidth * scale;
+      
+      ctx.drawImage(
+        image,
+        cropX, cropY, cropSize, cropSize,
+        0, 0, size, size
+      );
+      
+      document.getElementById('avatar').src = canvas.toDataURL();
+      document.getElementById('imageCropper').style.display = 'none';
+    }
+
+    function cancelCrop() {
+      document.getElementById('imageCropper').style.display = 'none';
+    }
+
+    function downloadCard() {
+      html2canvas(document.getElementById('card')).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'card.png';
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+    }
+
+    // 初始化默认比例
+    window.onload = () => {
+      setCardAspectRatio(document.getElementById('aspectRatioSelect').value);
+    };
+
+
+</script>
+
+</body>
+</html>
